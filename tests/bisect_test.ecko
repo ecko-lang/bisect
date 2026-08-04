@@ -1,0 +1,98 @@
+# Tests for the bisect package - offline, deterministic (no ai/fs/net).
+#
+# The behaviour mirrors Python's `bisect`, which is the reference everyone
+# reaches for: `left` puts an equal element before the run of equals, `right`
+# puts it after. The distinction only shows up on duplicates, so that is where
+# most of these live.
+import std.test
+import "../main.ecko"
+b = main
+
+test.case("left and right agree when the value is absent", fn() {
+    xs = [10, 20, 30, 40]
+    test.eq(b.left(xs, 25), 2)
+    test.eq(b.right(xs, 25), 2)
+    test.eq(b.left(xs, 5), 0)
+    test.eq(b.right(xs, 5), 0)
+    test.eq(b.left(xs, 50), 4)
+    test.eq(b.right(xs, 50), 4)
+})
+
+test.case("left and right straddle a run of equal values", fn() {
+    xs = [10, 20, 20, 20, 30]
+    test.eq(b.left(xs, 20), 1)
+    test.eq(b.right(xs, 20), 4)
+})
+
+test.case("an empty list has one insertion point", fn() {
+    test.eq(b.left([], 1), 0)
+    test.eq(b.right([], 1), 0)
+})
+
+test.case("a single-element list", fn() {
+    test.eq(b.left([5], 4), 0)
+    test.eq(b.left([5], 5), 0)
+    test.eq(b.left([5], 6), 1)
+    test.eq(b.right([5], 5), 1)
+})
+
+test.case("insert_left and insert_right keep the list sorted", fn() {
+    test.eq(b.insert_left([10, 30], 20), [10, 20, 30])
+    test.eq(b.insert_right([10, 30], 20), [10, 20, 30])
+    test.eq(b.insert_left([], 1), [1])
+    # The input is not mutated: Ecko values are copy-on-write.
+    xs = [1, 3]
+    _ = b.insert_left(xs, 2)
+    test.eq(xs, [1, 3])
+})
+
+test.case("insert_left goes before an equal run, insert_right after it", fn() {
+    # Distinguishable by what sits next to the inserted value, so tag the
+    # existing entries and insert an untagged one.
+    xs = ["b1", "b2"]
+    test.eq(b.insert_left(xs, "b"), ["b", "b1", "b2"])
+    test.eq(b.insert_right(xs, "b"), ["b", "b1", "b2"])
+})
+
+test.case("has finds a present value and rejects an absent one", fn() {
+    xs = [1, 3, 5, 7]
+    test.ok(b.has(xs, 5), "5 is present")
+    test.ok(b.has(xs, 4) == false, "4 is absent")
+    test.ok(b.has([], 1) == false, "nothing is in an empty list")
+})
+
+test.case("index returns the first position, or null", fn() {
+    test.eq(b.index([1, 3, 3, 3, 5], 3), 1)
+    test.eq(b.index([1, 3, 5], 4), null)
+    test.eq(b.index([], 1), null)
+})
+
+test.case("a key function searches by a derived value", fn() {
+    people = [{ name: "a", age: 20 }, { name: "b", age: 30 }, { name: "c", age: 40 }]
+    by_age = fn(p) p.age
+    test.eq(b.left_by(people, 30, by_age), 1)
+    test.eq(b.right_by(people, 30, by_age), 2)
+    test.eq(b.left_by(people, 35, by_age), 2)
+})
+
+test.case("insert_by places a record by its key", fn() {
+    people = [{ name: "a", age: 20 }, { name: "c", age: 40 }]
+    out = b.insert_by(people, { name: "b", age: 30 }, fn(p) p.age)
+    test.eq(map(out, fn(p) p.name), ["a", "b", "c"])
+})
+
+test.case("strings order lexicographically like any other comparable", fn() {
+    xs = ["apple", "banana", "cherry"]
+    test.eq(b.left(xs, "blueberry"), 2)
+    test.ok(b.has(xs, "banana"), "banana is present")
+})
+
+test.case("the insertion point of a large run is found without scanning", fn() {
+    # 1000 copies of the same value: a linear scan would still pass, but this
+    # pins the contract that left/right bracket the whole run.
+    xs = map(range(0, 1000), fn(_) 7)
+    test.eq(b.left(xs, 7), 0)
+    test.eq(b.right(xs, 7), 1000)
+    test.eq(b.left(xs, 6), 0)
+    test.eq(b.right(xs, 8), 1000)
+})

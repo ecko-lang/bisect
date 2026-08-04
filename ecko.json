@@ -1,0 +1,10 @@
+{
+  "module": "github.com/ecko-lang/bisect",
+  "version": "0.9.5",
+  "entrypoint": "main.ecko",
+  "description": "Binary search over a sorted list: insertion points, membership, and order-preserving insert. Pure - no capabilities.",
+  "author": "Sean Nieuwoudt <sean@underwulf.com>",
+  "license": "MIT",
+  "capabilities": [],
+  "dependencies": {}
+}

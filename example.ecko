@@ -1,0 +1,48 @@
+# bisect - keeping a list sorted without re-sorting it.
+#
+#   ecko example.ecko
+
+import "./main.ecko" as bisect
+
+# --- insertion points ---------------------------------------------------------
+
+scores = [10, 20, 20, 20, 30, 40]
+print("list: {scores}")
+print("  left(20)  = {bisect.left(scores, 20)}   (start of the run of 20s)")
+print("  right(20) = {bisect.right(scores, 20)}   (one past the end of it)")
+print("  count(20) = {bisect.count(scores, 20)}")
+print("  left(25)  = {bisect.left(scores, 25)}   (where a 25 would go)")
+print("")
+
+# --- membership ---------------------------------------------------------------
+
+print("has(30) = {bisect.has(scores, 30)}, has(35) = {bisect.has(scores, 35)}")
+print("index(20) = {bisect.index(scores, 20)}, index(35) = {bisect.index(scores, 35)}")
+print("")
+
+# --- building a sorted list incrementally -------------------------------------
+
+# The point of the package: inserting in place stays sorted, so you never pay
+# to re-sort. Each insert is a binary search plus a copy.
+mut leaderboard = []
+for score in [50, 20, 80, 20, 65, 10] {
+    leaderboard = bisect.insert_right(leaderboard, score)
+}
+print("inserted one at a time, always sorted: {leaderboard}")
+print("")
+
+# --- searching records by a field ---------------------------------------------
+
+people = [
+    { name: "Ada", age: 20 },
+    { name: "Grace", age: 35 },
+    { name: "Alan", age: 41 },
+    { name: "Edsger", age: 52 },
+]
+by_age = fn(p) p.age
+
+print("people by age: {map(people, fn(p) p.name)}")
+print("  first person aged 35 or more is at index {bisect.left_by(people, 35, by_age)}")
+
+placed = bisect.insert_by(people, { name: "Barbara", age: 38 }, by_age)
+print("  after inserting Barbara (38): {map(placed, fn(p) p.name)}")

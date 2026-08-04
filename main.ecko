@@ -1,0 +1,99 @@
+# bisect - binary search over a sorted list.
+#
+# The list must already be sorted; nothing here checks that, because checking
+# would cost the O(n) the binary search exists to avoid. Feed it something
+# unsorted and you get a meaningless answer, quickly.
+#
+#   import bisect
+#
+#   bisect.left([10, 20, 20, 30], 20)     # 1 - before the run of equals
+#   bisect.right([10, 20, 20, 30], 20)    # 3 - after it
+#   bisect.insert_left(xs, 25)            # a new list, still sorted
+#   bisect.has(xs, 20)                    # membership in O(log n)
+#
+# The `_by` variants take a key function, for searching a list of records by
+# one of their fields.
+#
+# Pure computation - no capabilities.
+
+## The leftmost position where `x` could be inserted with the list still
+## sorted. If `x` is already present, this is the index of the first copy, so
+## `left` is what you want for "where does this value start".
+export fn left(items, x) {
+    left_by(items, x, fn(v) v)
+}
+
+## The rightmost position where `x` could be inserted with the list still
+## sorted. If `x` is present, this is one past the last copy, so
+## `right(xs, x) - left(xs, x)` counts the copies.
+export fn right(items, x) {
+    right_by(items, x, fn(v) v)
+}
+
+## `left`, comparing `key(item)` rather than the item itself.
+export fn left_by(items, x, key) {
+    mut lo = 0
+    mut hi = len(items)
+    while lo < hi {
+        # (lo + hi) / 2 is fine here: Ecko ints are 64-bit and checked, so the
+        # overflow this expression is famous for cannot happen silently.
+        mid = (lo + hi) / 2
+        if key(items[mid]) < x { lo = mid + 1 } else { hi = mid }
+    }
+    lo
+}
+
+## `right`, comparing `key(item)` rather than the item itself.
+export fn right_by(items, x, key) {
+    mut lo = 0
+    mut hi = len(items)
+    while lo < hi {
+        mid = (lo + hi) / 2
+        # The single difference from `left_by`: an equal element sends the
+        # search right rather than left, so the run of equals ends up behind us.
+        if x < key(items[mid]) { hi = mid } else { lo = mid + 1 }
+    }
+    lo
+}
+
+## A new list with `x` inserted at `left`, leaving the input untouched.
+export fn insert_left(items, x) {
+    at(items, x, left(items, x))
+}
+
+## A new list with `x` inserted at `right`, leaving the input untouched.
+export fn insert_right(items, x) {
+    at(items, x, right(items, x))
+}
+
+## A new list with `item` inserted by its key, keeping the list sorted.
+export fn insert_by(items, item, key) {
+    at(items, item, right_by(items, key(item), key))
+}
+
+## Splice `x` into `items` at `index`.
+export fn at(items, x, index) {
+    mut out = take(items, index)
+    out = push(out, x)
+    for i in index..len(items) {
+        out = push(out, items[i])
+    }
+    out
+}
+
+## Is `x` present? O(log n), unlike the linear `contains` builtin.
+export fn has(items, x) {
+    i = left(items, x)
+    i < len(items) and items[i] == x
+}
+
+## The index of the first `x`, or null when it is absent.
+export fn index(items, x) {
+    i = left(items, x)
+    if i < len(items) and items[i] == x { i } else { null }
+}
+
+## How many copies of `x` the list holds.
+export fn count(items, x) {
+    right(items, x) - left(items, x)
+}
