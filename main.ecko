@@ -35,9 +35,9 @@ export fn left_by(items, x, key) {
     mut lo = 0
     mut hi = len(items)
     while lo < hi {
-        # (lo + hi) / 2 is fine here: Ecko ints are 64-bit and checked, so the
+        # (lo + hi) // 2 is fine here: Ecko ints are 64-bit and checked, so the
         # overflow this expression is famous for cannot happen silently.
-        mid = (lo + hi) / 2
+        mid = (lo + hi) // 2
         if key(items[mid]) < x { lo = mid + 1 } else { hi = mid }
     }
     lo
@@ -48,7 +48,7 @@ export fn right_by(items, x, key) {
     mut lo = 0
     mut hi = len(items)
     while lo < hi {
-        mid = (lo + hi) / 2
+        mid = (lo + hi) // 2
         # The single difference from `left_by`: an equal element sends the
         # search right rather than left, so the run of equals ends up behind us.
         if x < key(items[mid]) { hi = mid } else { lo = mid + 1 }
