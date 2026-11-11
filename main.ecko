@@ -16,22 +16,31 @@
 #
 # Pure computation - no capabilities.
 
-## The leftmost position where `x` could be inserted with the list still
-## sorted. If `x` is already present, this is the index of the first copy, so
-## `left` is what you want for "where does this value start".
-export fn left(items, x) {
-    left_by(items, x, fn(v) v)
+fn check_list(fname, items) {
+    unless is_list(items) {
+        error(
+            {
+                kind: "bug",
+                reason: "bad_argument",
+                message: "bisect.{fname}: items must be a list, got {type_of(items)}",
+            },
+        )
+    }
 }
 
-## The rightmost position where `x` could be inserted with the list still
-## sorted. If `x` is present, this is one past the last copy, so
-## `right(xs, x) - left(xs, x)` counts the copies.
-export fn right(items, x) {
-    right_by(items, x, fn(v) v)
+fn check_key(fname, key) {
+    unless type_of(key) in ["function", "native_function"] {
+        error(
+            {
+                kind: "bug",
+                reason: "bad_argument",
+                message: "bisect.{fname}: key must be a function, got {type_of(key)}",
+            },
+        )
+    }
 }
 
-## `left`, comparing `key(item)` rather than the item itself.
-export fn left_by(items, x, key) {
+fn search_left(items, x, key) {
     mut lo = 0
     mut hi = len(items)
     while lo < hi {
@@ -43,36 +52,19 @@ export fn left_by(items, x, key) {
     lo
 }
 
-## `right`, comparing `key(item)` rather than the item itself.
-export fn right_by(items, x, key) {
+fn search_right(items, x, key) {
     mut lo = 0
     mut hi = len(items)
     while lo < hi {
         mid = (lo + hi) // 2
-        # The single difference from `left_by`: an equal element sends the
+        # The single difference from `search_left`: an equal element sends the
         # search right rather than left, so the run of equals ends up behind us.
         if x < key(items[mid]) { hi = mid } else { lo = mid + 1 }
     }
     lo
 }
 
-## A new list with `x` inserted at `left`, leaving the input untouched.
-export fn insert_left(items, x) {
-    at(items, x, left(items, x))
-}
-
-## A new list with `x` inserted at `right`, leaving the input untouched.
-export fn insert_right(items, x) {
-    at(items, x, right(items, x))
-}
-
-## A new list with `item` inserted by its key, keeping the list sorted.
-export fn insert_by(items, item, key) {
-    at(items, item, right_by(items, key(item), key))
-}
-
-## Splice `x` into `items` at `index`.
-export fn at(items, x, index) {
+fn splice(items, x, index) {
     mut out = take(items, index)
     out = push(out, x)
     for i in index..len(items) {
@@ -81,19 +73,156 @@ export fn at(items, x, index) {
     out
 }
 
-## Is `x` present? O(log n), unlike the linear `contains` builtin.
+fn identity(v) = v
+
+## Returns the leftmost index where `x` could be inserted with the list still
+## sorted.
+##
+## When `x` is present this is the index of its first copy, so `left` answers
+## "where does this value start". The list must already be sorted.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list.
+##
+## example:
+##   bisect.left([10, 20, 20, 30], 20)   # 1
+export fn left(items, x) {
+    check_list("left", items)
+    search_left(items, x, identity)
+}
+
+## Returns the rightmost index where `x` could be inserted with the list still
+## sorted.
+##
+## When `x` is present this is one past its last copy. The list must already
+## be sorted.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list.
+##
+## example:
+##   bisect.right([10, 20, 20, 30], 20)   # 3
+export fn right(items, x) {
+    check_list("right", items)
+    search_right(items, x, identity)
+}
+
+## Returns the leftmost insertion index for `x`, comparing `key(item)` rather
+## than each item itself.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list or `key` is not a
+## function.
+##
+## example:
+##   bisect.left_by(people, 35, fn(p) p.age)
+export fn left_by(items, x, key) {
+    check_list("left_by", items)
+    check_key("left_by", key)
+    search_left(items, x, key)
+}
+
+## Returns the rightmost insertion index for `x`, comparing `key(item)` rather
+## than each item itself.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list or `key` is not a
+## function.
+##
+## example:
+##   bisect.right_by(people, 35, fn(p) p.age)
+export fn right_by(items, x, key) {
+    check_list("right_by", items)
+    check_key("right_by", key)
+    search_right(items, x, key)
+}
+
+## Returns a new list with `x` inserted before any equal items, still sorted.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list.
+##
+## example:
+##   bisect.insert_left([1, 3], 2)   # [1, 2, 3]
+export fn insert_left(items, x) {
+    check_list("insert_left", items)
+    splice(items, x, search_left(items, x, identity))
+}
+
+## Returns a new list with `x` inserted after any equal items, still sorted.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list.
+##
+## example:
+##   bisect.insert_right([1, 3], 2)   # [1, 2, 3]
+export fn insert_right(items, x) {
+    check_list("insert_right", items)
+    splice(items, x, search_right(items, x, identity))
+}
+
+## Returns a new list with `item` inserted by `key(item)`, after any items
+## with an equal key, keeping the list sorted by that key.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list or `key` is not a
+## function.
+##
+## example:
+##   bisect.insert_by(people, { name: "Barbara", age: 38 }, fn(p) p.age)
+export fn insert_by(items, item, key) {
+    check_list("insert_by", items)
+    check_key("insert_by", key)
+    splice(items, item, search_right(items, key(item), key))
+}
+
+## Returns a new list with `x` inserted at `index`, which must be between 0
+## and `len(items)` inclusive; `len(items)` appends. The list is unchanged.
+##
+## errors: `bug`/`bad_index` when `index` is not an Int in that range;
+## `bug`/`bad_argument` when `items` is not a list.
+##
+## example:
+##   bisect.at([1, 2, 3], 9, 1)   # [1, 9, 2, 3]
+export fn at(items, x, index) {
+    check_list("at", items)
+    unless type_of(index) == "int" and index >= 0 and index <= len(items) {
+        error(
+            {
+                kind: "bug",
+                reason: "bad_index",
+                message: "bisect.at: index must be an int from 0 to {len(items)}, got {index}",
+            },
+        )
+    }
+    splice(items, x, index)
+}
+
+## Returns true when the sorted list contains `x`, in O(log n).
+##
+## errors: `bug`/`bad_argument` when `items` is not a list.
+##
+## example:
+##   bisect.has([10, 20, 30], 20)   # true
 export fn has(items, x) {
-    i = left(items, x)
+    check_list("has", items)
+    i = search_left(items, x, identity)
     i < len(items) and items[i] == x
 }
 
-## The index of the first `x`, or null when it is absent.
+## Returns the index of the first `x` in the sorted list, or null when it is
+## absent.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list.
+##
+## example:
+##   bisect.index([10, 20, 20], 20)   # 1
 export fn index(items, x) {
-    i = left(items, x)
+    check_list("index", items)
+    i = search_left(items, x, identity)
     if i < len(items) and items[i] == x { i } else { null }
 }
 
-## How many copies of `x` the list holds.
+## Returns how many copies of `x` the sorted list holds.
+##
+## errors: `bug`/`bad_argument` when `items` is not a list.
+##
+## example:
+##   bisect.count([10, 20, 20, 30], 20)   # 2
 export fn count(items, x) {
-    right(items, x) - left(items, x)
+    check_list("count", items)
+    search_right(items, x, identity) - search_left(items, x, identity)
 }

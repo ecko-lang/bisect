@@ -96,3 +96,41 @@ test.case("the insertion point of a large run is found without scanning", fn() {
     test.eq(b.left(xs, 6), 0)
     test.eq(b.right(xs, 8), 1000)
 })
+
+fn kind_reason(f) = try {
+    f()
+    null
+} catch (e) { "{get(e, "kind")}/{get(e, "reason")}" }
+
+test.case("at splices at 0, in the middle and at the end", fn() {
+    test.eq(b.at([1, 2, 3], 9, 0), [9, 1, 2, 3])
+    test.eq(b.at([1, 2, 3], 9, 2), [1, 2, 9, 3])
+    test.eq(b.at([1, 2, 3], 9, 3), [1, 2, 3, 9])
+    test.eq(b.at([], 9, 0), [9])
+})
+
+test.case("at refuses a negative, past-the-end or non-Int index", fn() {
+    test.eq(kind_reason(fn() b.at([1, 2, 3], 9, -1)), "bug/bad_index")
+    test.eq(kind_reason(fn() b.at([1, 2, 3], 9, 4)), "bug/bad_index")
+    test.eq(kind_reason(fn() b.at([1, 2, 3], 9, 1.5)), "bug/bad_index")
+})
+
+test.case("count counts the copies", fn() {
+    xs = [1, 2, 2, 2, 3]
+    test.eq(b.count(xs, 2), 3)
+    test.eq(b.count(xs, 4), 0)
+    test.eq(b.count([], 1), 0)
+})
+
+test.case("ints and floats search together", fn() {
+    xs = [1, 1.5, 2, 2.5, 3]
+    test.eq(b.left(xs, 2), 2)
+    test.eq(b.right(xs, 2.0), 3)
+    test.ok(b.has(xs, 1.5), "has 1.5")
+})
+
+test.case("a non-list or a non-function key is a bug naming the function", fn() {
+    test.eq(kind_reason(fn() b.left("abc", "b")), "bug/bad_argument")
+    test.eq(kind_reason(fn() b.left_by([1], 1, "key")), "bug/bad_argument")
+    test.eq(kind_reason(fn() b.at(null, 1, 0)), "bug/bad_argument")
+})

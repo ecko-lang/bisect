@@ -1,10 +1,8 @@
-# bisect - Ecko Std Lib Package
+# bisect
 
-Binary search over a sorted list: insertion points, membership, and
-order-preserving insert. The shape of Python's `bisect`, which is the reference
-most people already have in mind.
-
-Pure computation - no capabilities.
+Binary search over a sorted list: insertion points, membership and
+order-preserving insert, in the shape of Python's `bisect`. Pure computation -
+no capabilities.
 
 ## Install
 
@@ -19,27 +17,33 @@ import bisect
 ## Usage
 
 ```ecko
+import bisect
+
 scores = [10, 20, 20, 20, 30]
 
-bisect.left(scores, 20)          # 1 - the start of the run of 20s
-bisect.right(scores, 20)         # 4 - one past the end of it
-bisect.count(scores, 20)         # 3
-bisect.has(scores, 30)           # true, in O(log n)
-
-bisect.insert_right(scores, 25)  # a new list, still sorted
+print(bisect.left(scores, 20))  # 1 - the start of the run of 20s
+print(bisect.right(scores, 20))  # 4 - one past the end of it
+print(bisect.count(scores, 20))  # 3
+print(bisect.has(scores, 30))  # true, in O(log n)
+print(bisect.insert_right(scores, 25))  # [10, 20, 20, 20, 25, 30]
 ```
 
-Searching records by a field:
+### Searching records by a field
 
 ```ecko
+import bisect
+
+people = [{ name: "Ada", age: 20 }, { name: "Grace", age: 35 }, { name: "Alan", age: 41 }]
 by_age = fn(p) p.age
-bisect.left_by(people, 35, by_age)
-bisect.insert_by(people, { name: "Barbara", age: 38 }, by_age)
+
+print(bisect.left_by(people, 35, by_age))  # 1
+placed = bisect.insert_by(people, { name: "Barbara", age: 38 }, by_age)
+print(map(placed, fn(p) p.name))  # [Ada, Grace, Barbara, Alan]
 ```
 
 ## API
 
-| function | what it does |
+| function | returns |
 |---|---|
 | `left(items, x)` | leftmost insertion point; the index of the first `x` if present |
 | `right(items, x)` | rightmost insertion point; one past the last `x` if present |
@@ -51,9 +55,21 @@ bisect.insert_by(people, { name: "Barbara", age: 38 }, by_age)
 | `has(items, x)` | membership, `O(log n)` |
 | `index(items, x)` | index of the first `x`, or `null` |
 | `count(items, x)` | how many copies of `x` |
-| `at(items, x, index)` | splice `x` in at a known index |
+| `at(items, x, index)` | a new list with `x` spliced in at `index` (0 to `len(items)`) |
 
 ## Notes
+
+### Errors
+
+| kind | reason | when |
+|---|---|---|
+| `bug` | `bad_argument` | `items` is not a list, or `key` is not a function |
+| `bug` | `bad_index` | `at` got an index that is not an Int from 0 to `len(items)` |
+
+Comparing items that cannot be ordered against `x` (a string against an int)
+fails with the runtime's own `bug` error.
+
+### Behaviour
 
 **The list must already be sorted.** Nothing here checks that, because checking
 would cost the `O(n)` the binary search exists to avoid. An unsorted list gives
@@ -75,8 +91,6 @@ copy-on-write, so the copy happens once and only when needed.
 ecko test
 ```
 
-Offline and deterministic.
-
 ## License
 
-MIT
+[MIT](LICENSE)
